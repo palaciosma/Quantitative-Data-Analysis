@@ -1,0 +1,170 @@
+---
+title: "Lab 5 part 2"
+output: html_document
+date: "2022-10-19"
+---
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+df <- read.csv("Diet_r.csv")
+head(df)
+```
+
+Firstly, let's explore the data:
+
+```{r}
+summary(df)
+```
+First, we can check for missing values:
+
+```{r}
+colSums(is.na(df))
+```
+There are 2 missing values regarding the gender. Since this categorical value is criical in order to proceed, we will just get rid of those two rows:
+
+```{r}
+df2 <- df[-c(1,2),]
+```
+
+```{r}
+colSums(is.na(df2))
+```
+
+Let's take a look at the distribution of weight before and after:
+
+```{r}
+# Person vs preweight
+ggplot(data=df2, aes(x=Person, y=pre.weight)) + geom_point() + theme_classic() +
+  ggtitle("Pre weight distribution")
+
+# Person vs actual weight
+ggplot(data=df2, aes(x=Person, y=weight6weeks)) + geom_point() + theme_classic() +
+  ggtitle("Actual weight distribution")
+```
+
+We will dive into this later, but let's see the distribution of the variables:
+
+```{r}
+# Gender
+ggplot(df2, aes(x=gender)) +
+  geom_bar()
+
+# Age
+hist(df2$Age, 
+     main="Age", 
+     col="darkgray",
+     prob = FALSE
+     )
+
+# Height
+hist(df2$Height, 
+     main="Height", 
+     col="darkgray",
+     prob = FALSE
+     )
+
+# Pre weight
+hist(df2$pre.weight, 
+     main="Pre weight", 
+     col="darkgray",
+     prob = FALSE
+     )
+
+# Diet
+ggplot(df2, aes(x=Diet)) +
+  geom_bar()
+
+# Weight after 6 weeks
+hist(df2$weight6weeks, 
+     main="Actual weight", 
+     col="darkgray",
+     prob = FALSE
+     )
+
+```
+
+Now, we see how each variable is defined. We need to make changes, so categorical data must be set as factors:
+
+```{r}
+str(df2)
+```
+
+```{r}
+df2$gender <- as.factor(df2$gender)
+df2$Diet <- as.factor(df2$Diet)
+```
+
+Now we can test our first hypothesis: Is there a difference in weight before and after the diet?
+
+```{r}
+# Weight by gender before diet
+ggplot(data = df2, aes(x=gender, y=pre.weight)) + geom_boxplot(aes(fill=Diet))
+
+# Weigth by gender aftyer diet
+ggplot(data = df2, aes(x=gender, y=weight6weeks)) + geom_boxplot(aes(fill=Diet))
+```
+
+As seen, the weights in between diets looks similar, but we want to be more specific: We will do hypothesis testing with the weights. First we need to check for normality:
+
+```{r}
+shapiro.test(df2$pre.weight)
+shapiro.test(df2$weight6weeks)
+```
+As seen, both p-values are high enough, so we cannot reject the null hypothesis, and therefore consider both variables to be normally distributed.
+
+```{r}
+t.test(df2$pre.weight,df2$weight6weeks, alternative = "two.sided")
+```
+
+Doing a simple t-test, we can see that the p-value is < 0.05, so we can reject the null hypothesis, and therefore there is statistical difference in mean weights before and after dieting. But this analysis is really poor, as we are not taking into account the different categorical values.
+
+Before starting, we can compute a new column containing the total weight-loss per person:
+
+```{r}
+df2$weightloss <- df2$pre.weight - df2$weight6weeks
+```
+
+Additionally, we can also add a column adding the bmi before and after dieting:
+
+```{r}
+df2$bmi.before <- df2$pre.weight/((df2$Height/100)^2)
+df2$bmi.after <- df2$weight6weeks/((df2$Height/100)^2)
+```
+
+
+```{r}
+summary(df2$weightloss)
+summary(df2$bmi.before)
+summary(df2$bmi.after)
+```
+
+Now, we can use ANOVA and ANCOVA to model the relationship between the weight loss and the participants measurements/demographics. We can start with a simple analysis of variance between the weightoss and the type of diet applied:
+
+```{r}
+summary(aov(df2$weightloss~df2$Diet))
+```
+This confirms that the diet types have significantly different weight-loss means.
+
+```{r}
+summary.lm(aov(df2$weightloss~df2$Diet))
+```
+As we can see, Diet 3 is significantly different from Diets 1 and 2 (with almost identical mean weight-loss), so we could say its the "most effective". Again, as the p-value is <0.05, we can say that there is a statistical difference between groups. 
+
+```{r}
+aggregate(weightloss~Diet, data=df2, FUN="mean")
+```
+As seen, the mean weight-loss for Diet 3 is the highest. 
+
+We can also perform a more detailed study, and see what is the effect of gender in all this, using ANCOVA:
+
+```{r}
+ancova.wl<-lm(df2$weightloss~df2$Diet+df2$gender)
+summary(ancova.wl)
+```
+
+We can see from the results of the model that gender is not a significant coefficient, and the $r^2$ is very very low. This does not seem like a model that is more useful than the ANOVA using only the diet as the explanatory variable, where the $r^2$ is slightly higher (but almost the same really). 
+
+
