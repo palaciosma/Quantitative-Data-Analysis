@@ -1,0 +1,128 @@
+---
+title: "lab-8-part-1"
+author: "Isabel Sassoon"
+date: "2022-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Table Analysis
+
+In this lab we will explore how to perform table analysis. This is useful when there are multiple columns of data that are categorical.
+
+```{r}
+library(vcdExtra)
+```
+
+The data we are using is called Arthritis which is part of the vcd package.
+
+```{r}
+help(Arthritis)
+```
+
+
+Lets explore the data:
+
+```{r}
+summary(Arthritis)
+```
+
+
+We can see there is an ID, Gender, Age and whether the person had a Marked Improvement, Some improvement or none.
+
+Table analysis can help us if we want to find out if there is a relationship between the improvement and the treatment (for example).
+
+```{r}
+table(Arthritis$Improved, Arthritis$Treatment)
+```
+
+
+
+The null hypothesis that we are testing is: $H_0$: The treatment and improvement are independent.
+The alternative hypothesis is: $H_1$: There is a relationship between the treatment and the improvement.
+
+
+```{r}
+chisq.test(table(Arthritis$Improved, Arthritis$Treatment))
+```
+
+
+We can see that our $\chi^2$ is significant - so there is a dependence between treatment and outcome.
+
+Note that there is no cell in the table that is so small that we need to consider using Fisher's exact test.
+
+***
+
+We can now take this one step further and see if we can answer the question: 
+*What attributes affect the success of the treatment?*
+
+If we wanted to model this relationship further we could transform the dependent variable from one with three values to one with two and then use Logistic regression.
+
+```{r}
+table(Arthritis$Improved)
+```
+
+There are three levels, but we can define a new dependent variable - 1 when there is an improvement (some or marked) and 0 if there is none. 
+ 
+```{r}
+Arthritis$Improved.Ind<-ifelse(Arthritis$Improved=="None", 0,1)
+```
+ 
+Now we can model this:
+
+```{r}
+Arthritis.lr<-glm(Arthritis$Improved.Ind~Arthritis$Treatment, family = "binomial")
+summary(Arthritis.lr)
+```
+
+This confirms our table analysis that the treatment does significantly relates to the likelihood of improvement.
+
+
+We can also look at the coefficients as Odds Ratios
+
+```{r}
+exp(coef(Arthritis.lr))
+```
+
+
+The probability of improvement is improved by a factor 4.46 when there is treatment.
+
+But what about the other possible covariates (other explanatory variables)?
+
+```{r}
+Arthritis2.lr<-glm(Arthritis$Improved.Ind~Arthritis$Treatment+ Arthritis$Sex+ Arthritis$Age, family = "binomial")
+summary(Arthritis2.lr)
+```
+
+```{r}
+exp(coef(Arthritis2.lr))
+```
+
+We can see that the probability of improvement is higher with treatment (by a factor of 5.8), it is lower by a factor 0.23 if the patient is male and increases marginally with age.
+
+***
+
+A word of caution...
+
+
+```{r}
+Arthritis3.lr<-glm(Arthritis$Improved.Ind~Arthritis$Treatment+Arthritis$Sex+Arthritis$Age + Arthritis$Improved, family = "binomial")
+summary(Arthritis3.lr)
+```
+
+If you see something like this - stop and check. AIC is small the p-values are all 1...
+this is a sign that you need to reflect on your explanatory variable choice.
+
+Essentially Improved and Improved are *the same* so this model is not useful at all!
+
+Recall:
+
+```{r}
+table(Arthritis$Improved, Arthritis$Improved.Ind)
+```
+
+
+At times in this situation you will get errors or warnings when you run the code.

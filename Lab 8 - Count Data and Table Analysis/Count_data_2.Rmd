@@ -1,0 +1,184 @@
+---
+title: "QDA Lab 8 part 2 - a Solution"
+author: "Dr Isabel Sassoon"
+date: "November 2022"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+---
+
+# Part 1 - ARM data
+
+Reading in (importing) the arm folding data.
+
+```{r}
+arm.folding<-read.csv("arm.csv")
+```
+
+
+```{r}
+names(arm.folding)
+```
+
+
+This data contains two columns only and they are both categorical so explore their content using table:
+
+```{r}
+table(arm.folding$gender)
+table(arm.folding$armcross)
+```
+The two categorical variables are the gender of the participant and the arm crossed on top.
+
+Lets look at the table for both categories:
+
+```{r}
+table(arm.folding$gender, arm.folding$armcross)
+```
+
+We can test for independence using $\chi^2$, as the expected number in the cells is more than 5. Note that if that were not the case R would complain! (And we would use Fisher's exact)
+
+```{r}
+arm.table<-table(arm.folding$gender, arm.folding$armcross)
+chisq.test(arm.table)
+```
+
+We can see from this output that with a p-value of 0.898 that this is not significant. There is no relationship between the gender and the arm cross direction.
+
+*** 
+If you wanted to run Fisher's exact:
+
+```{r}
+fisher.test(arm.table)
+```
+
+Note: it is not necessary in this case but wanted to show that it would return the similar conclusion.
+***
+
+# Part 2 - back to titanic
+
+## 1. Read in the data
+
+```{r}
+titanic<-read.csv("titanic-all-cols.csv")
+```
+
+
+## 2. Explore the Data
+
+Recall from week 7 - we need to make sure that the data is read in correctly:
+
+```{r}
+summary(titanic)
+```
+
+We need to make sure that both Survived and Pclass are treated as categorical, so I use as.factor to make sure that is the case.
+
+```{r}
+titanic$Survived<-as.factor(titanic$Survived)
+titanic$Pclass<-as.factor(titanic$Pclass)
+```
+
+## Table Analysis
+
+Use Table analysis on the categorical variables, for example if you wanted to answer the research questions:
+
+### (3a) Is Survival related to passenger travel class?  
+Lets look at table analysis for Survived vs Pclass
+
+Are survival status and Passenger class independent? That is the $H_0$ that we are testing here
+
+```{r}
+table(titanic$Survived, titanic$Pclass)
+```
+
+Lets use Chisq
+
+```{r}
+chisq.test(table(titanic$Survived, titanic$Pclass))
+```
+
+We can see that there is a significant relationship between Passenger travel class and survival status. In other words the probability of surviving depends on the passenger's travel class.
+
+If we wanted to model this probability then this is when logistic regression can help - and this is what we did in Lab 7 part 2.
+
+### (3b) Is there a relationship between survival and port of embarking?
+
+We can take a similar approach to answering this research question. 
+
+```{r}
+table(titanic$Survived, titanic$Embarked)
+```
+
+There are some missing values for Embarked
+
+We can remove them before testing the hypothesis that there is a relationship.
+
+```{r}
+titanic.no.na<-subset(titanic, titanic$Embarked!="" )
+```
+
+We can see that this new data frame has two less rows.
+Now lets run the test using Chi squared. IF we wanted to treat the embarked port being missing as a category in its own right then we would need to run Fisher's exact.
+
+```{r}
+chisq.test(table(titanic.no.na$Survived, titanic.no.na$Embarked))
+```
+This shows that there is a significant relationship between the survival status and the passenger embarkment port. 
+
+### (3c) Is there a relationship between survival and gender ?
+
+```{r}
+table(titanic$Survived, titanic$Sex)
+```
+
+There are no missing values to contend with or issues with cells with less than 5 expected. So we can run Chi-sq to test whether there is or isn't a relationship between these two.
+
+```{r}
+chisq.test(table(titanic$Survived, titanic$Sex))
+```
+
+This output shows that the p-value is small and therefore there is a significant relationship between Gender and survival status. (Again from the work done in week 7 this is not a surprise!)
+
+
+
+## 4. Hypotheiss testing
+
+Test the following hypothesis : male passengers’s age is different from female passenger’s age. Practice writing out the H0 and H1 and explain which approach you would take. Report your conclusion.
+
+First we can compute the mean age for the two genders. Then as this involves means we use the t.test.
+
+```{r}
+aggregate(titanic$Age~titanic$Sex, FUN="mean")
+```
+Male passengers have a higher mean in this sample.
+
+The $H_0$ hypothesis is that the mean age is the same for males and females. $H_0: \mu_f=\mu_m$
+The alternative hypothesis or $H_1$ is that the mean age is NOT the same for males and females. $H_1: \mu_f\ne\mu_m$
+
+```{r}
+t.test(titanic$Age~titanic$Sex)
+```
+
+We can see that there is a significant difference. p-value =0.011. At the $\alpha=0.05$ we would have grounds to reject the NUll hypothesis that the mean age is the same for Males and Females.
+
+***
+
+## OPTIONAL: Using the gmodels library:
+
+The Gmodels library is useful if you are used to SAS PROC means or PROC summary.
+
+```{r}
+library(gmodels)
+```
+
+
+```{r}
+CrossTable(titanic$Survived, titanic$Pclass, digits=2, prop.r = TRUE, prop.c = TRUE,  prop.chisq = FALSE, 
+           chisq = TRUE, fisher = TRUE)
+```
+
+As you can see it provides both tests. When you are reporting your findings you should still comment on the one that is appropriate to the situation...and explain why you chose to report that and not the other...
+
+
