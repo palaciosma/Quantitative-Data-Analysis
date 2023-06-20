@@ -1,0 +1,181 @@
+---
+title: "Lab4 part 2"
+output: html_document
+date: "2022-10-12"
+---
+
+# Linear Regression and Correlation
+
+For this practrice, we will use the following dataset:
+
+```{r}
+df <- read.csv("birthweight.csv", sep = ";")
+head(df)
+```
+
+Let's explore the data, numerically and graphically:
+
+```{r}
+summary(df)
+```
+
+```{r}
+hist(df$bw, 
+     main="BW", 
+     xlab="grams", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$bw), col = "red")
+```
+
+```{r}
+hist(df$bpd, 
+     main="BPD", 
+     xlab="mm", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$bpd), col = "red")
+```
+```{r}
+hist(df$ad, 
+     main="AD", 
+     xlab="mm", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$ad), col = "red")
+```
+
+Let's also check for normality:
+
+```{r}
+shapiro.test(df$bw)
+```
+
+```{r}
+shapiro.test(df$bpd)
+```
+
+```{r}
+shapiro.test(df$ad)
+```
+As seen, we can only reject the null hypothesis for BW, therefore we consider it as the only variable normally distributed.
+
+Now, let's check correlation among variables:
+
+```{r}
+cor(df$bw, df$bpd)
+cor(df$bw, df$ad)
+cor(df$ad, df$bpd)
+
+```
+As seen, the highest correlation seems to be between bw and ad. Let's see the graphs:
+
+```{r}
+library(ggplot2)
+
+ggplot(data=df, aes(x=bw, y=bpd)) + geom_point() + theme_classic() +
+  ggtitle("Scatter Plot for bw vs bpd")
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data=df, aes(x=bw, y=ad)) + geom_point() + theme_classic() +
+  ggtitle("Scatter Plot for bw vs ad")
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(data=df, aes(x=bpd, y=ad)) + geom_point() + theme_classic() +
+  ggtitle("Scatter Plot for bpd vs ad")
+```
+
+
+
+Let's now build a regression model having BW as the dependent variable and BPD as the explanatory variable:
+
+```{r}
+baby.lm<-lm(df$bw~df$bpd, data=df)
+baby.lm
+```
+```{r}
+summary(baby.lm)
+```
+Both coefficients (BW and BPD) are significant, as their p-values are really small. Also, 0.63 of the variance is explained by the model.
+
+The relationship between the bw and the bpd is such that for every increase in bpd of 1mm - the bw increases by 92.14g.
+
+```{r}
+plot(baby.lm)
+```
+The fit is not ideal. Let's do the same but taking AD as the explanatory variable:
+
+```{r}
+baby.lm2<-lm(df$bw~df$ad, data=df)
+baby.lm2
+```
+```{r}
+summary(baby.lm2)
+```
+
+Again, both coefficients (BW and AD) are significant, as their p-values are really small. Also, 0.76 of the variance is explained by the model, which is better than the previous one.
+
+The relationship between the bw and the ad is such that for every increase in ad of 1mm - the bw increases by 55.12g.
+
+```{r}
+plot(baby.lm2)
+```
+
+Therefore, as seen, AD is slightly more accurate at predicting the BW than ADP, not only because of a higher r-squared value, also because of the highest significance of their p-values, as wel as the visual affirmation by looking at both Q-Q plots.
+
+Now, we can try some transformations, to see if we get a better fit:
+
+```{r}
+baby.lm3<-lm(df$bw~df$ad+ I(df$ad^2))
+baby.lm3
+```
+```{r}
+summary(baby.lm3)
+```
+This transformation does not make so much sense to make, and we see we get worse fit. 
+
+Finally, we can find estimates based on our model:
+
+$y= -5505.406 + 92.141 \times x$
+
+Let find an estimate for bw when bpd = 80
+
+```{r}
+y.est<- -5505.406 + 92.141*80
+y.est
+```
+I would not personally rely on this prediction, as this model does not have that good of a fit.
+
+Now, for:
+
+$y= -2867.916 + 55.122 \times x$
+
+Let find an estimate for y when ad = 105
+
+```{r}
+y.est<- -2867.916 + 55.122*105
+y.est
+```
+Finally, we know that the mean birth weight in the UK is 3300g. Let's check the mean bw of our sample:
+
+```{r}
+mean(df$bw)
+```
+
+As the bw is normally distributed (seen before), we can perform a t test to check whether there is a significant difference between the sample mean and population mean:
+
+$H_0: \mu=3300$ and $H_1: \mu \ne 3300$
+
+```{r}
+t.test(df$bw, mu=3300, alternative = "two.sided")
+```
+A seen, the p-value is so small we can confidentally reject the null hypothesis H0 and therefore state that the sample mean and the population mean are not equal.
