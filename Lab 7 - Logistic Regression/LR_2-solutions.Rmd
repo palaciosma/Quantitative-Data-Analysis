@@ -1,0 +1,349 @@
+---
+title: "Lab-7-independent-practice-a-solution"
+author: "Isabel Sassoon"
+date: "2022-10-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Logistic Regression using the Titanic Data set
+
+Firstly the required libraries are loaded. 
+
+```{r}
+library(ggplot2)
+```
+
+## 1. Read in the data and check it
+
+
+```{r}
+titanic<-read.csv("data-independent-practice/titanic-analysis.csv")
+```
+
+Initially I will explore the contents of the data that were read in.
+
+```{r}
+summary(titanic)
+```
+
+The data set contains 5 variables: PassengerID, Survuved, Sex, Age and Fare. Only the age appears to have 177 rows of missing data. As Age is not the dependent variable the fact that the data is missing is not an issue.
+
+From the summary function it can be seen that there are no implausible values (e.g. age=300).
+
+The aim (3) is to model the likelihood of surviving so the dependent variable is: survived
+
+Check that it is correctly read in:
+Looking at the output of the summary function we can see it has not been correctly interpreted by R. (It would also be possible to check using str(titanic))
+In order to fix this it can be changed into a factor:
+
+```{r}
+titanic$Survived<-as.factor(titanic$Survived)
+table(titanic$Survived)
+```
+
+We can see from this that 342 passengers survived.
+
+## 2. Explore the data 
+
+In order to explore the data I will firstly look at each column individually and then look at the correlations and the relationship between the explanatory and the dependent variable.
+
+### Univariate - one at a time
+
+Lets start with Age and Fare:
+
+```{r}
+ggplot(titanic, aes(x=Age)) + geom_histogram(bins=20) +ggtitle("Histogram for Age of Passenger") + theme_classic()
+ggplot(titanic, aes(x=Fare)) + geom_histogram(bins=20) +ggtitle("Histogram for Fare Passenger") + theme_classic()
+```
+
+From the the plots so far we can see that Age and Fare seem acceptable in ranges, nothing implausible. We are not requiring specific distributional assumptions (i.e. we are not expecting any of these to be normal). 
+
+```{r}
+table(titanic$Sex)
+```
+
+We can observe that there were more male passengers in the list - 577 vs 314.
+
+Now we can explore the relationship between the two numerical variables:
+
+```{r}
+ggplot(titanic, aes(x=Fare, y=Age)) + geom_point() +ggtitle("Scatter plot of Age and Fare") + theme_classic()
+```
+
+We can also see from the scatter plot that there is no linear correlation (evident) between Age and Fare.
+
+### Bi-variate (One explanatory variable at a time vs dependent variable)
+
+Now lets look at the Age and the Fare vs the Survival
+
+```{r}
+ggplot(titanic, aes(x=Survived, y=Age)) + geom_boxplot() + ggtitle("Boxplot of Age vs Survival status") + theme_classic()
+```
+There is no difference in the median ages (from the plot) between survivors and those passengers who perished.
+
+```{r}
+ggplot(titanic, aes(x=Survived, y=Fare)) + geom_boxplot() + ggtitle("Boxplot of Fare paid vs Survival status") + theme_classic()
+```
+This plot of fare vs survival status shows a difference in the median Fare and their survival status.
+
+For the gender and the survival status we can use another graph type:
+
+```{r}
+mosaicplot(titanic$Survived~titanic$Sex, main = "Mosaic Plot of Survival status by Gender", ylab="Gender", xlab="Survival Status")
+```
+We can see that the proportion of males surviving is smaller than that for females.
+
+From all the data checking in 1 and the exploratory data analysis in 2 there are no reasons not to use all the explanatory variables in the model.
+
+# 3. Use the appropriate model to check which of the explanatory variables (the gender, age and fare paid) affects the likelihood of surviving? Explain the relationships you uncover.
+
+The dependent variable is survived - which is binary so the approach to model this relationship is using *Logistic Regression*. 
+
+The data exploration done did not point to any reasons not to use any of the explanatory variables therefore initially lets start with a model with all those explanatory variables, but no interactions:
+
+```{r}
+titanic.glm<-glm(titanic$Survived~titanic$Age+titanic$Sex+titanic$Fare, family = "binomial")
+summary(titanic.glm)
+```
+
+From this we can see that the Fare and the gender are significant but not Age.
+
+```{r}
+exp(coef(titanic.glm))
+```
+
+The odds ratios show us that being Male lowers survival chances, with every increase in fare there is an increase in survival odds and with every increase in year (Age) there is a decrease in survival odds.
+
+Lets simplify the model - we can do this manually or using step.
+In this situation there are only three explanatory variables to consider therefore it is ok to do this manually. Note that you may get different models...
+I am starting by removing Age.
+
+```{r}
+titanic2.glm<-glm(titanic$Survived~titanic$Sex+titanic$Fare, family = "binomial")
+summary(titanic2.glm)
+```
+
+Now there is a dilemma....use the more complex model (titanic.glm that makes use of a variable that has missing data) or a simpler model (titanic2.glm) with a higher AIC?
+
+I am going to use the simpler model (titanic2.glm), as it will be easier to explain and all the coefficients are significant.
+
+Model interpretation: 
+
+```{r}
+exp(coef(titanic2.glm))
+```
+
+We can see that gender = male decreases the odds of surviving whilst a one unit increase in Fare improves the odds of survival slightly. 
+
+Intuitively - Female passengers with more expensive tickets were more likely to survive.
+
+
+# 4. What are the odds ratio for Male vs Female passengers?
+
+
+```{r}
+exp(coef(titanic2.glm))
+```
+
+The odds ratio for Male vs Female passengers is 0.08.
+
+OPTIONAL - the code below computes a confidence interval for the Odds ratio.
+
+```{r}
+exp(cbind(OR=coef(titanic2.glm), confint(titanic2.glm)))
+```
+
+We can see that being male lowers your chances of surviving, whereas the more expensive your ticket the higher the changes of surviving.
+
+
+***
+OPTIONAL - Another option would have been starting with a model that has interactions.In order to inform which interactions to include a tree can help.
+
+Lets start with a model with interactions. I am using a tree to explore the structure.
+
+```{r}
+library(tree)
+titanic.tree<-tree(titanic$Survived~titanic$Age+titanic$Sex+titanic$Fare)
+plot(titanic.tree)
+text(titanic.tree)
+```
+This tree structure points to potential interaction between fare and age. But as we have few explanatory variables to begin with lets put all the interactions in.
+(Note that the tree output shows a warning that NAs introduced by coercion, that is due to the missing values we already spotted in the data)
+
+***
+
+If my maximal model has interactions (either because these were highlighted in the tree or due to a suspicion that there may be some value in adding them) we can build a model and then use the *step* function to simplify.
+(note that once we have more than 3 or 4 explanatory variables adding interactions will cause the number of parameters to grow fast)
+
+```{r}
+titanic.i.glm<-glm(titanic$Survived~titanic$Age*titanic$Sex*titanic$Fare, family = "binomial")
+summary(titanic.i.glm)
+```
+The interactions between age and fare is indeed significant.
+The Deviance improvement from the simple model is not too great and the model is much more complex.
+
+In order to simplify the model we can use the step function:
+
+```{r}
+step(titanic.i.glm)
+```
+
+This proposes a minimal model that has age, far and gender. Therefore I would propose the first (Age, fare and gender) or second model (Fare and gender).
+
+
+***
+# 5. OPTIONAL: Load the *titanic-all-cols.csv* into your R notebook. Explore this additional data, and see if you can enrich your Logistic Regression model. Some of this is a repetition of what was done earlier in this markdown document.
+
+Starting with importing the full Titanic data
+
+```{r}
+titanic.all<-read.csv("data-independent-practice/titanic-all-cols.csv")
+```
+
+
+## The first step is to check that there are no data quality issues in the data:
+
+```{r}
+summary(titanic.all)
+```
+
+The summary statistics show that Survived was not read is as a factor, and also Pclass is best as a factor as it is class of travel.
+
+Survived and Pclass need to be turned into factors (repeating some of what was done for the smaller data set)
+
+```{r}
+titanic.all$Survived<-as.factor(titanic.all$Survived)
+titanic.all$Pclass<-as.factor(titanic.all$Pclass)
+```
+
+
+The contents of the categorical variables: 
+
+
+```{r}
+table(titanic.all$Survived)
+```
+
+342 passengers survived
+
+```{r}
+table(titanic.all$Pclass)
+```
+
+Most passengers travelled in 3rd class (491)
+
+```{r}
+table(titanic.all$Sex)
+```
+
+Most passengers were male (577).
+
+```{r}
+table(titanic.all$Cabin)
+```
+The cabin data has too many values - so wont be using this in the model any further.
+
+```{r}
+table(titanic.all$Embarked)
+```
+
+There are two missing values for the port of embarking. This is not an issue and this can be used in the analyis
+
+## Exploring the data 
+
+### Univariate 
+
+```{r}
+ggplot(titanic.all, aes(x=Fare)) + geom_histogram(bins=20) +ggtitle("Histogram for Fare") + theme_classic()
+ggplot(titanic.all, aes(x=Age)) + geom_histogram(bins=20) +ggtitle("Histogram for Age") + theme_classic()
+ggplot(titanic.all, aes(x=SibSp)) + geom_histogram(bins=20) +ggtitle("Histogram for Number of family members") + theme_classic()
+ggplot(titanic.all, aes(x=Parch)) + geom_histogram(bins=20) +ggtitle("Histogram for Number of Parents or children") + theme_classic()
+```
+
+From these plots we can see that there are no extreme or implausible values. Given there are no strict distributional requirements then this exploration has not raised any concerns. We learnt from Parch and SibSp that most passengers travelled alone.
+
+### Exploring the relationship with the target variable
+
+We can also look at the relation between the  explanatory variables and the dependent variable.
+
+Lets start with the categorical variable vs the target variable:
+
+```{r}
+table(titanic.all$Survived, titanic.all$Pclass)
+```
+
+There are proportionally more survivors in 1st class than third class
+
+```{r}
+table(titanic.all$Survived, titanic.all$Sex)
+```
+
+There are proportionally more female survivors 
+
+```{r}
+table(titanic.all$Survived, titanic.all$Embarked)
+```
+
+This is a mixed picture - perhaps a graphical view can be more interesting.
+
+A good visual for these types of relationships can be a mosaic plot
+
+```{r}
+mosaicplot(titanic.all$Survived~ titanic.all$Pclass, main="Pclass vs Survived", color=TRUE, xlab="Survived", ylab="Passenger Class")
+mosaicplot(titanic.all$Survived~ titanic.all$Sex, main="Gender vs Survived", color=TRUE, xlab="Survived", ylab="Passenger Travel class")
+mosaicplot(titanic.all$Survived~ titanic.all$Embarked, main="Port vs Survived", color=TRUE, xlab="Survived", ylab="Passenger Port of Embarkment")
+```
+We can see that there is a larger proportion of 3rd class passengers with the "perished- did not survive" class, as were male passengers. The port of embarkment's effect is not clear.
+
+However from this exploration, other than excluding Cabin due to the large number of values all the other columns can be part of our starting maximal model. As there are plenty of columns of data, there is no incentive to complicate the model further using iteractions in my opinion.
+
+## Modelling
+
+Now we can start with a model (a large one to begin with) but with no interactions. The exploration of the data did not point to any explanatory variables that should not be included at this stage.
+
+
+```{r}
+titanic.all.glm<-glm(titanic.all$Survived~titanic.all$Pclass+titanic.all$Sex+ titanic.all$Age +
+                       titanic.all$SibSp+ titanic.all$Parch + titanic.all$Fare + titanic.all$Embarked,family = "binomial")
+summary(titanic.all.glm)
+```
+
+Lets use a step function to simplify this time...
+
+```{r}
+step(titanic.all.glm)
+```
+
+The model it suggests is:
+
+```{r}
+titanic.step.glm<-glm(titanic.all$Survived ~ titanic.all$Pclass + titanic.all$Sex + 
+    titanic.all$Age + titanic.all$SibSp, family = "binomial")
+summary(titanic.step.glm)
+```
+
+### Results interpretation
+
+From these coefficients estimates we can see that:
+ - the higher the travel class the lower the logit for survival
+  - Males have lower survival chances
+  - the higher the number of siblings or spouses also point to lower survival chances
+  - Age also makes a difference, the higher the lower the survival chances
+  
+```{r}
+exp(coef(titanic.step.glm))
+```
+
+The odds ratio (obviously) paints the same picture as we saw earlier with the smaller subset of data (start of the markdown document)
+Survival odds are smaller for higher travel class, Male, Age and the higher the number of siblings or spouses.
+
+## Other possible approaches:
+- Don't use Age as it is has some missing values
+- Add the interactions to the minimal adequate model
+- introduce the interaction between Age and Fare is it was significant in the model based on the smaller data set
+- Use Tree to see what variables are important to differentiating between survival and not, and see if there are interactions.
+ 

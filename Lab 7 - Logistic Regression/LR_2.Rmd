@@ -1,0 +1,232 @@
+---
+title: "Lab 7 part 2"
+output: html_document
+date: "2022-11-02"
+---
+
+```{r}
+library(ggplot2)
+```
+
+
+First we read and explore the data 
+
+```{r}
+df <- read.csv("data-independent-practice/titanic-analysis.csv",stringsAsFactors = T)
+head(df)
+```
+
+The survival should be a factor, as it is binary:
+
+```{r}
+df$Survived <- as.factor(df$Survived)
+```
+
+We can check for NA:
+
+```{r}
+which(is.na(df$Survived))
+which(is.na(df$Sex))
+which(is.na(df$Age))
+which(is.na(df$Fare))
+
+```
+We can see there is a bast amount of NA for Age. In this case, we will not do anything and proceed, as it does not affect too much our study.
+
+```{r}
+summary(df)
+```
+
+We can see that the minimum age is 0.42. We suppose it wanted to mean 42, so we change it:
+
+```{r}
+which.min(df$Age)
+```
+
+```{r}
+df$Age[804] <- 42
+```
+
+```{r}
+df$Age <- as.integer(df$Age)
+```
+
+```{r}
+summary(df)
+```
+Error spotted, age cannot be 0 (Might not be an error, might just be babies so we will not take further action and consider them as babies)
+
+```{r}
+which(df$Age == 0)
+```
+
+```{r}
+table(df$Survived)
+```
+We can now check the relation between the sex and the survival:
+
+```{r}
+table(df$Survived, df$Sex)
+```
+As seen, males had much less chances of surviving than females.
+
+Exploring the relationship between the target variable and the numerical explanatory variables:
+
+```{r}
+ggplot(df, aes(x=Survived, y=Age))+ geom_boxplot() + theme_classic()+ ggtitle("Age vs Survival status")
+ggplot(df, aes(x=Survived, y=Fare))+ geom_boxplot() + theme_classic() + ggtitle("Fare vs Survival status")
+```
+
+We can clearly see that age did not have an impact on whether you would survive or not. On the other hand, people who survived generally paid higher fares, maybe for better seats or seats with better assistance?
+
+Lets start with this maximal model without interactions just to focus on the process and interpreting the outputs.
+
+```{r}
+df.lr<-glm(df$Survived~df$Sex+ df$Age+df$Fare, family=binomial)
+summary(df.lr)
+```
+
+We can see that the Sex and the Fare are highly significant determining the survival rate.
+
+And we can interpret the model as follows:
+
+For Gender = Male:
+$$log(\frac{p}{1-p})=0.898-2.349 \times 1- 0.009 \times \text{age} +0.012 \times \text{fare}$$
+Now, we can check the odds ratio:
+
+```{r}
+exp(coef(df.lr))
+```
+
+The odds of survival for gender=male are 0.095 - in other words they decrease by a factor 0.095. Therefore, males had a strongly smaller chance of survival.
+
+For a one unit increase in age, the odds of survival increase by a factor of 0.99 - in other words they decrease by a very slightly small amount.
+
+Lastly, for a one unit increase in fare price, the odds of survival increase by a factor of 1.012 - in other words they increase by a very slightly small amount.
+
+We can summarise that fare price slightly increases survival likelihood marginally. Gender = male decrease the likelihood.
+
+Now, we can start over with the bigger dataset
+and then compare accuracy with the predictions:
+
+```{r}
+df2 <- read.csv("data-independent-practice/titanic-all-cols.csv",stringsAsFactors = T)
+head(df2)
+```
+
+```{r}
+df2$Survived <- as.factor(df2$Survived)
+df2$Pclass <- as.factor(df2$Pclass)
+#df2$SibSp <- as.factor(df2$SibSp)
+#df2$Parch <- as.factor(df2$Parch)
+
+```
+
+We can check the data again
+
+```{r}
+View(df2)
+```
+
+```{r}
+summary(df2)
+```
+Fix the things that are off
+
+```{r}
+df2$Age[804] <- 42
+df2$Embarked[df2$Embarked == ""] <- NA
+```
+
+```{r}
+summary(df2)
+```
+Also, to simplify things, we are going to make the cabin binary: 0 for not having a cabin and 1 for having one
+
+```{r}
+df2$Cabin <- as.character(df2$Cabin)
+df2$Cabin[df2$Cabin == ""] <- 0
+```
+
+```{r}
+df2$Cabin[df2$Cabin != 0] <- 1
+df2$Cabin <- as.factor(df2$Cabin)
+```
+
+
+Exploring the dataset, it looks like GENERALLY, the cabins correspond to more expensive fares (which was guessed previously).
+
+```{r}
+ggplot(df2, aes(x=Survived, y=Age, fill = Sex))+ geom_boxplot() + theme_classic()+ ggtitle("Age and Sex vs Survival status")
+ggplot(df2, aes(x=Survived, y=Age, fill = Embarked))+ geom_boxplot() + theme_classic()+ ggtitle("Age Embarked vs Survival status")
+ggplot(df2, aes(x=Survived, y=Age, fill = Cabin))+ geom_boxplot() + theme_classic()+ ggtitle("Age Cabin vs Survival status")
+ggplot(df2, aes(x=Survived, y=Age, fill = Pclass))+ geom_boxplot() + theme_classic()+ ggtitle("Age Cabin vs Survival status")
+
+```
+
+As seen, among the people who survived, the ones who had a cabin had more chances. But they also had more chances to die.
+
+Lets run a maximal model without interactions:
+
+```{r}
+df2.max.lr<-glm(df$Survived~df2$Pclass+df2$Sex+df2$Age+df2$SibSp+df2$Parch+df2$Fare+df2$Cabin+df2$Embarked, family=binomial)
+summary(df2.max.lr)
+```
+As seen, Pclass, Sex and Age are highly relevant, and SibSp is relevant.
+
+```{r}
+exp(coef(df2.max.lr))
+```
+Interesting to look at.
+
+Now, we are going to use all these data to make predictions of survival, and compare the accuracy of model 1 and model 2:
+
+```{r}
+df$psurvive<-predict(df.lr, newdata = df, type="response")
+head(df)
+```
+
+
+```{r}
+df$prediction[df$psurvive > 0.5 & df$Survived ==1] <- 1
+df$prediction[df$psurvive < 0.5 & df$Survived ==1] <- 0
+df$prediction[df$psurvive < 0.5 & df$Survived ==0] <- 1
+df$prediction[df$psurvive > 0.5 & df$Survived ==0] <- 0
+```
+
+```{r}
+head(df)
+```
+
+
+```{r}
+df2$psurvive<-predict(df2.max.lr, newdata = df2, type="response")
+head(df2)
+```
+
+
+```{r}
+df2$prediction[df2$psurvive > 0.5 & df2$Survived ==1] <- 1
+df2$prediction[df2$psurvive < 0.5 & df2$Survived ==1] <- 0
+df2$prediction[df2$psurvive < 0.5 & df2$Survived ==0] <- 1
+df2$prediction[df2$psurvive > 0.5 & df2$Survived ==0] <- 0
+```
+
+```{r}
+head(df2)
+```
+
+
+```{r}
+table(df$prediction)
+table(df2$prediction)
+```
+```{r}
+accmodel1 <- 554 / (160 + 554)
+accmodel1
+
+accmodel2 <- 573 / (139 + 573)
+accmodel2
+```
+
+As seen, the second model is more accurate than the first one. Therefore, the model is more precise including data like the Cabin, the PClass and SibSp.
