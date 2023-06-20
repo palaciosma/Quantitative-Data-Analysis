@@ -1,0 +1,141 @@
+---
+title: "lab6-part2"
+output: html_document
+date: "2022-10-26"
+---
+```{r}
+library(ggplot2)
+library(mgcv)
+library(tree)
+```
+
+```{r}
+df <- read.csv("crime-analysis-data.csv")
+```
+
+```{r}
+head(df)
+```
+
+
+First, we need to check the data as always:
+
+```{r}
+summary(df)
+```
+The variable HighYouthUnemploy should be a categorical variable (actually binary as it only has two levels). R has read it in as numerical so this can be fixed by making it into a Factor.
+
+```{r}
+df$HighYouthUnemploy<-as.factor(df$HighYouthUnemploy)
+```
+
+
+So far so good, there are no missing values, extreme values, or strange patterns in the summaries. Now, lets check the relation of the continuous explanatory variables with the Crime Rate:
+
+```{r}
+ggplot(data = crime, aes(x=Youth, y=CrimeRate)) + geom_point() + theme_classic() + ggtitle("Youth vs Crime Rate")
+ggplot(data = crime, aes(x=Education, y=CrimeRate)) + geom_point() + theme_classic()+ ggtitle("Education vs Crime Rate")
+ggplot(data = crime, aes(x=LabourForce, y=CrimeRate)) + geom_point()  + theme_classic()+ ggtitle("Labour Force vs Crime Rate")
+ggplot(data = crime, aes(x=ExpenditureYear0, y=CrimeRate)) + geom_point()  + theme_classic() + ggtitle("Expenditure vs Crime Rate")
+ggplot(data = crime, aes(x=YouthUnemployment, y=CrimeRate)) + geom_point()  + theme_classic()+ ggtitle("Youth Unemployment vs Crime Rate")
+ggplot(data = crime, aes(x=MatureUnemployment, y=CrimeRate)) + geom_point()  + theme_classic() + ggtitle("Mature Unemployment vs Crime Rate")
+ggplot(data = crime, aes(x=Wage, y=CrimeRate)) + geom_point()  + theme_classic()+ ggtitle("Wage vs Crime Rate")
+ggplot(data = crime, aes(x=StateSize, y=CrimeRate)) + geom_point() + theme_classic()+ ggtitle("State Size vs Crime Rate")
+
+```
+
+The collection of scatter plots do not show that any of the variables is clearly linear, but some show a linear trend.
+
+To see the correlation values, we can check the correlation matrix:
+
+```{r}
+df.cont<-subset(crime, select=c("CrimeRate", "Youth", "Education", "ExpenditureYear0", "LabourForce",  "YouthUnemployment", "MatureUnemployment",
+                                   "Wage", "StateSize") )
+
+cor(df.cont)
+```
+We can see interesting strong positive correlationss with ExpenditureYear0, Wage and Statesize.
+
+```{r}
+df.tree<-tree(df$CrimeRate~., data = df)
+plot(df.tree)
+text(df.tree)
+```
+
+
+Now, we are going to run a maximal model. For this, we are firstly going to include all the explanatory continuous variables, as specified. Moreover, we will add the quadratic term to ExpenditureYear0, as it appears to show some sort of curvature.
+
+Before proceeding, we obtain the exact state size, instead of "hundred thousands".
+
+```{r}
+df$StateSize <- df$StateSize * 100000
+```
+
+
+```{r}
+m1.lm<-lm(df$CrimeRate~df$Youth+df$Education+df$ExpenditureYear0+df$MatureUnemployment + df$LabourForce+df$YouthUnemployment+df$StateSize + df$Wage)
+
+summary(m1.lm)
+```
+This model has a significant F score, a rather mid $r^2$ and some coefficients are significant. Therefore, we can try to obtain the minimal adequate model using the step() function:
+
+```{r}
+m2.lm<-step(m1.lm)
+summary(m2.lm)
+```
+We obtain slightly better results with this model, being the coefficients more significant.
+
+From the model summary for this minimal adequate model (mam.lm) we can see that crime rate is dependent on the variables Youth, ExpenditureYear0   and LabourForce. In all these cases an increase in their value increases the crime rate estimate.
+
+$$CrimeRate= -230.01795 +1.02436\times Youth+ 0.77626 \times ExpenditureYear0 + 0.80540 \times MatureUnemployment +   0.17379 \times LabourForce $$
+
+```{r}
+plot(m2.lm)
+```
+In this case the residuals look ok, the variance is quite steady in the first plot - considering the data size.
+QQ plot also looks aligned, with a few points standing out as outliers. We could explore these in more detail but as the model is good there may be no need to.
+
+
+########## final project purposes
+```{r}
+library("GGally")
+```
+```{r}
+ggpairs(df, columns = c(1,2,5,7))
+```
+
+As seen, there is no clear correlation with none of those variables.
+##########
+
+Instead of only including the continuous variables in the model we can now add them all in, including the factor variable. 
+
+```{r}
+model.all.lm<-lm(df$CrimeRate~df$Youth+df$Education+df$ExpenditureYear0
+                 +df$MatureUnemployment + df$LabourForce+df$YouthUnemployment+df$StateSize + df$Wage+ df$HighYouthUnemploy)
+
+summary(model.all.lm)
+```
+
+The $r^2 $ is higher than for the model without the factors but lets see what a step process would achieve in terms of simplifying the model:
+
+```{r}
+step(model.all.lm)
+```
+
+The binary (factor) variable we added as part of the explanatory variables does not add much and this is confirmed as the step process proposes a model that does not include it as an explanatory variable.
+
+
+```{r}
+ggplot(crime, aes(x=HighYouthUnemploy, y=CrimeRate)) + geom_boxplot() + ggtitle("Crime rate by High Youth Unemployment indicator")+ theme_classic()
+```
+
+Therefore the model from section 6 is probably still the most suitable one to use to answer the question asked "what variables affect the crime rate and how?".
+
+
+Lastly, we can solve a quick hypothesis testing problem. Supposing the average education time in the population is 14 years, we can test whether the average education time in our sample is significantly smaller.
+
+```{r}
+t.test(df$Education, mu=14, alternative="less", conf.level = 0.95)
+```
+
+As seen, the p-value is very very small, so we can reject H0 (sample mean and population mean are equal) and therefore state that the sample mean education time is significantly smaller than the population's.
