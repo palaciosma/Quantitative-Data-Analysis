@@ -1,0 +1,205 @@
+---
+title: "Lab2-independent-practice-a-solution"
+author: "Isabel Sassoon"
+date: "27/09/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1.  Confidence Intervals
+
+## (3) Reading in the data
+
+The csv file is read into a dataframe in R which I have called mpg using the read.csv function.
+
+```{r}
+mpg<-read.csv("auto-mpg.csv")
+```
+
+## (4) Visualise the mpg data and check which columns from the continuous variables look normally distributed
+
+First lets look at the numerical summaries of the variables using the summary function:
+
+```{r}
+summary(mpg)
+```
+
+Acceleration looks to have a similar mean and median, so I am picking this one to explore further.
+
+Another way of finding continuous variables that have a normal-like shaped distribution is to use a histogram.
+
+```{r}
+hist(mpg$acceleration, main="Histogram of Acceleration", xlab="Acceleration")
+```
+
+(NOTE: in this case I used the base R histogram function - I could also have made use of ggplot)
+
+We can also look at the other numerical variables in a similar way:
+
+```{r}
+hist(mpg$weight, main="Histogram of Weight", xlab="Weight")
+```
+
+This distribution is not symmetrical and as such does not "visually" resemble a normal distribution. 
+
+There is another variable that would have been expected to be numerical but is not! Lets look at the summary for the data set again:
+
+```{r}
+summary(mpg)
+```
+
+**horsepower** is read in by R as a character. If we try to run functions that expect a numerical input they will fail. So lets see what is inside this column. 
+
+```{r}
+head(mpg$horsepower, n=40)
+```
+
+Clearly there is a row that has "?" which is not a number.
+
+If we wanted to use this as a numerical variable we need to deal with this. One way is to create a new variable that will have blank for rows where there are "?".
+__Dont overwrite the original data__ that is not good practice!
+
+```{r}
+#firstly replace ? with NA
+mpg$horsepower.numerical<-ifelse(mpg$horsepower=="?",NA ,mpg$horsepower)
+#then convert to numerical
+mpg$horsepower.numerical<-as.numeric(mpg$horsepower.numerical)
+#run summary to test its working
+summary(mpg$horsepower.numerical)
+```
+
+Now we can plot this one too!
+
+```{r}
+hist(mpg$horsepower.numerical, main="Histogram of Horsepower", xlab="Horsepower")
+```
+And no its not looking like a normal distribution!
+
+
+
+## (6) Compute a 95% confidence interval for the mean for one of the variable that appears to be normally distributed
+
+Lets use the variable acceleration and compute the confidence intervals. As this is a numeric variable we will be computing the confidence interval for its mean using t.test.
+
+
+
+```{r}
+t.test(mpg$acceleration)
+```
+
+From this output we can see that the mean of acceleration is 15.6 - matching what we saw from the summary function output. We can also see that the confidence interval for that mean is (15.3, 15.8) (These numbers are rounded).
+
+
+## (7) The model years range from the 70s and the 80s. What proportion of cars are from the 80s? 
+
+There are 398 cars in this data set (you can see this using dim or from the Environment pane of R Studio)
+
+```{r}
+table(mpg$model.year)
+sum(mpg$model.year>79)
+```
+
+There are 89 cars from the years 80,81 and 82
+
+```{r}
+prop.80<-sum(mpg$model.year>79)/nrow(mpg)
+prop.80
+```
+
+About 22% (or 0.22) of the cars are from the 80s.
+
+
+## (8) Compute a 90% confidence interval for the proportion of cars from the 80s?
+
+Note: this will be a different function from the one used to do confidence intervals for the mean as we need to compute a confidence interval for a proportion.
+
+We should use the function prop.test(). The two first parameters for this function are the number of successes (in this case the number of cars from the 80s) and the number of "attempts" (in this case the total numnber of cars in our data).
+
+```{r}
+prop.test(89, 398, conf.level = 0.9)
+```
+
+We can see from this that the 90% confidence interval is (0.19,  0.26). We are 90% confident that the true proportion lies between these two values.
+
+If we want the 95% confindence interval
+
+```{r}
+prop.test(89, 398, conf.level = 0.95)
+```
+
+We can see from this that the 95% confidence interval is (0.18,  0.27). We are 95% confident that the true proportion lies between these two values.
+
+## Extension  
+(6) [OPTIONAL] Compute the confidence intervals for the mean using the "bootstrap method".	
+
+This code loops over the different sample sizes and samples a size of 200 with replacement, returning the mean every time.
+The distribution of these values is then used to plot the confidence interval.
+
+```{r}
+a<-sample(mpg$acceleration ,100, replace=T)	
+
+plot(c(0,200), c(0,30), type="n", xlab="Sample Size", ylab="Confidence Interval")
+
+for (k in seq(10,200,10)){
+  a<-numeric(200)
+  for (i in 1:200){
+  a[i]<-mean(sample(mpg$acceleration, k , replace=T)	)
+  }
+  points(c(k,k),quantile(a,c(0.025, 0.975)), type="b", pch=21, bg="red")
+}
+```
+
+	
+***
+
+## Distribtions - Extension Challenge
+
+(1) Assume that among diabetics the fasting blood level of glucose is approximately normally distributed with a mean of 105 mg per 100 ml and a standard deviation of 9mg per 100ml.
+
+(a) Plot the density function for this distribution.
+
+In order to do this first we need to generate the x values that are suitable for a normal distribution with the parameters above. This can be done making use of the dnorm function.
+```{r}
+x<-seq(60,150)
+y<-dnorm(x,mean = 105, sd=9)
+```
+
+Then we can plot x and the values generated by dnorm. Below I am embedding the code to generate the values from a normal distribution within the plot code. However you can also split the process into smaller steps and plot x vs y.
+
+```{r}
+plot(x, dnorm(x,mean = 105, sd=9), type = "l")
+```
+
+--note-- it is also possible to use ggplot to do this.
+
+(2) What proportion of diabetics have levels between 90 and 125 mg per 100ml? (This quantity is represented by the area under the normal curve between 90 and 125)
+
+We can visualise this using 
+
+```{r}
+plot(x, dnorm(x,mean = 105, sd=9), type = "l")
+abline(v=90, lty=2)
+abline(v=125, lty=3)
+```
+
+(c) You should see from the plot that most of the area under the normal curve is contained between the two vertical lines. Therefore we should expect that the proportion of diabetics with levels between 90 and 125 mg per 100 ml to be high. 
+
+
+Use the **pnorm** function to calculate this proportion. (you may need to use it twice)
+
+```{r}
+pnorm(125, mean = 105, sd=9)-pnorm(90, mean = 105, sd=9)
+```
+
+94% of the diabetics have values between 90 and 125
+
+(d) What level cuts off the lower 10% of diabetics? (hint: use **qnorm**)
+
+```{r}
+qnorm(0.1, mean = 105, sd=9)
+```
+
+	This cut off value is 93ml

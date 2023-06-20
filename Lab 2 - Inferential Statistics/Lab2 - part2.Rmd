@@ -1,0 +1,203 @@
+---
+title: "Lab 2 - part 2"
+output: html_document
+date: "2022-09-30"
+---
+
+#Confidence Intervals
+
+For this practice, we are going to use the "auto-mpg" dataset.
+
+```{r}
+df <- read.csv("auto-mpg.csv")
+```
+
+A brief summary:
+
+```{r}
+summary(df)
+```
+
+As seen, horsepower should also be numeric. Looking at the df, there are some values containing "?". We will replace these with Na:
+
+```{r}
+df[df == "?"] <- NA
+```
+
+Now we will obtain the statistics summary:
+
+```{r}
+summary(df$horsepower)
+```
+Something weird is still happening. We will need to convert "horsepower" from character to numeric
+
+```{r}
+df$horsepower <- as.numeric(df$horsepower)
+```
+
+Now lets check.
+
+```{r}
+summary(df$horsepower)
+```
+
+Now we have all the information correctly displayed. Now, we have to check which columns look normally distributed:
+
+```{r}
+names(df)
+```
+```{r}
+library(ggplot2)
+```
+
+
+```{r}
+ggplot(df)+ geom_bar(aes(x=mpg), fill="blue") +
+  labs(title = "mpg") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+
+```{r}
+ggplot(df)+ geom_bar(aes(x=cylinders), fill="blue") +
+  labs(title = "cylinders") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+
+```{r}
+ggplot(df)+ geom_bar(aes(x=displacement), fill="blue") +
+  labs(title = "displacement") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+```{r}
+ggplot(df)+ geom_bar(aes(x=horsepower), fill="blue") +
+  labs(title = "horsepower") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+
+```{r}
+ggplot(df)+ geom_bar(aes(x=weight), fill="blue") +
+  labs(title = "weight") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+```{r}
+ggplot(df)+ geom_bar(aes(x=acceleration), fill="blue") +
+  labs(title = "acceleration") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+
+```{r}
+ggplot(df)+ geom_bar(aes(x=model.year), fill="blue") +
+  labs(title = "model year") +
+  scale_y_continuous(name="Frequency", breaks=c(0,5,10)) +
+  theme_classic()
+```
+
+As seen, the only variable apparently normally distributed is "acceleration". Let's obtain it's 95% CI:
+
+```{r}
+t.test(df$acceleration)
+```
+Being (15.23, 15.84)
+
+Now, what proportion of cars are form the 80s?
+
+```{r}
+length(which(df$model.year >= 80))
+```
+```{r}
+89/length(df$model.year)
+```
+There is an easier method to compute this:
+
+```{r}
+mean(df$model.year >= 80)
+```
+
+Thus, the proportion of cars form the 80s is 0.22. Now, we are asked to compute the 90% CI for this proportion:
+
+```{r}
+prop.test(89, length(df$model.year), conf.level = 0.9)
+```
+
+Although, we know this answer is NOT correct, as the variable "model year" is not normally distributed. For this, we would have to apply a bootstrap:
+
+```{r}
+library(boot)
+```
+
+```{r}
+set.seed(1)
+func <- function(data,i){
+  d <- data[i,]
+  c(
+    mean(d[,7])
+  )
+}
+```
+
+```{r}
+boot1 <- boot(df,func,R=1000)
+boot1
+```
+```{r}
+boot.ci(boot1,index=1)
+```
+In this process, we have calculated the 95% CI for the mean of the "model.year" variable. Now, we will calculate the 90% CI for the proportion of cars produced later than the 80s:
+
+```{r}
+set.seed(2)
+func1 <- function(data,i){
+  d <- data[i,]
+  c(
+    mean(d[,7] >= 80)
+  )
+}
+```
+
+```{r}
+boot2 <- boot(df,func1,R=1000)
+boot2
+```
+```{r}
+boot.ci(boot2,index=1, conf = 0.9)
+```
+So the 90% CI for the proportion of cars made past the 80s is (0.1887,  0.2558).
+
+#Distributions
+
+Assume that among diabetics the fasting blood level of glucose is approximately normally
+distributed with a mean of 105 mg per 100 ml and a standard deviation of 9mg per 100ml.
+
+To visualize it:
+
+```{r}
+curve(dnorm(x, 105, 9), from=92, to=118)
+```
+Now, to find the proportion of diabetics that have levels between 90 and 125 mg per 100ml, we can do the following:
+
+```{r}
+level125 <- pnorm(125, 105, 9)
+level125
+```
+```{r}
+level90 <- pnorm(90, 105, 9)
+level90
+```
+```{r}
+answer <- level125-level90
+answer
+```
+Being that the final answer.
+
+Now we want to know what level cuts off the lower 10% of diabetics:
+
+```{r}
+qnorm(0.1,mean=105,sd=9)
+```
+Therefore, 10% of diabetics will have a level of glucose of 93.46 mg or lower.
