@@ -1,0 +1,170 @@
+---
+title: "Lab 3 - part 2"
+output: html_document
+date: "2022-10-05"
+---
+#1. Hypothesis testing
+
+The given population mean is 0.5. A new experiment produces new diamonds with the following weights:
+
+```{r}
+new.diamonds <- c(0.46, 0.61, 0.52, 0.48, 0.57, 0.54)
+```
+
+It is essential that the new process produces diamonds with a weight in excess of 0.50 carat. We have the following Hypothesis testing (1% significance level):
+
+$H_0: \mu=0.5$ and $H_1: \mu \gt 0.5$
+
+```{r}
+t.test(new.diamonds, mu=0.5, alternative="greater", conf.level = 0.99)
+```
+As seen, at a 99% confidence level, the p-value is greater than 0.05, thus we cannot reject $H_0. 
+
+For the next part of the lab, we are going to use the data on breast cancer.
+
+```{r}
+df <- read.csv("BreastCancer_Wisconsin.csv")
+head(df)
+```
+Let's explore the variables
+
+```{r}
+summary(df)
+```
+
+```{r}
+# Changing diagnosis from a character type to a Factor
+df$diagnosis <- as.factor(df$diagnosis)
+summary(df$diagnosis)
+```
+
+```{r}
+hist(df$radius.mean, 
+     main="Radius mean", 
+     xlab="Mean", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$radius.mean), col = "red") 
+```
+
+```{r}
+hist(df$radius.sd, 
+     main="Radius sd", 
+     xlab="sd", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$radius.sd), col = "red") 
+```
+
+```{r}
+hist(df$radius.max, 
+     main="Radius max", 
+     xlab="max", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(df$radius.max), col = "red") 
+```
+
+Almost all of them look normally distributed, but we can actually check this:
+
+```{r}
+shapiro.test(df$radius.mean)
+```
+
+```{r}
+shapiro.test(df$radius.sd)
+```
+
+```{r}
+shapiro.test(df$radius.max)
+```
+
+As seen, all p-values are very small, thus, we can reject the null hypothesis that these variables are normally distributed.
+
+We can easily compute the proportion of benign tumours, looking at the table previously done
+
+```{r}
+357/length(df$diagnosis)
+```
+
+Knowing the proportion of benign tumours of the population from which the data is drawn is 0.6, is the sample proportion equal?
+
+$H_0: \mu=0.6$ and $H_1: \mu \ne 0.6$
+
+```{r}
+prop.test(357,length(df$diagnosis), p=0.6,alternative = "two.sided")
+```
+
+As seen, the p-value is greater than 0.05, and therefore, we cannot reject the null hypothesis. Therefore, the proportions are the same for the sake of the problem. 
+
+Now, we explore the radius.mean attribute numerically and graphically:
+
+```{r}
+summary(df$radius.mean)
+```
+
+We have seen what it looks like graphically before.
+
+Is there significant difference between the radius mean for benign v malignant? Let's find out:
+
+First, we will compute this assuming normality in both distributions:
+
+```{r}
+b.tumours<-subset(df,df$diagnosis=="B")
+m.tumours<-subset(df,df$diagnosis=="M")
+```
+
+Now this is our hypothesis:
+
+$H_0: \mu_{b}=\mu_{m}$ $H_1: \mu_{b} \ne \mu_{b}$
+
+```{r}
+t.test(b.tumours$radius.mean,m.tumours$radius.mean, alternative = "two.sided")
+
+```
+
+As the p-value is very small, we can reject the null hypothesis, and therefore confirm that both means are not equal. We can check this visually also:
+
+```{r}
+hist(b.tumours$radius.mean, 
+     main="B tumours mean", 
+     xlab="mean", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(b.tumours$radius.mean), col = "red")
+```
+
+```{r}
+hist(m.tumours$radius.mean, 
+     main="m tumours mean", 
+     xlab="mean", 
+     col="darkgray",
+     prob = TRUE
+     )
+lines(density(m.tumours$radius.mean), col = "red")
+```
+As seen graphicaly, both subgroups do not look normally distributed. To check this:
+
+```{r}
+shapiro.test(b.tumours$radius.mean)
+```
+```{r}
+shapiro.test(m.tumours$radius.mean)
+```
+As seen, the Malign tumors are not normally distributed, unlike the Benign ones, which apparently are. Therefore, as one of the samples is not normally distributed, we should have used the Wilcoxon Ranked Sum Test:
+
+```{r}
+wilcox.test(b.tumours$radius.mean, m.tumours$radius.mean)
+```
+Again, the p-value is smaller than the significance level, so we can therefore reject the Null Hypothesis and assume that both means are not equal.
+
+Finally, we can compute the 95% CI for the proportion og benign tumors computed in c):
+
+```{r}
+prop.test(357, length(df$diagnosis), conf.level = 0.95)
+```
+Being the 95% CI (0.5860680, 0.6670184)
